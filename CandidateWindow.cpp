@@ -42,9 +42,11 @@ CandidateWindow::CandidateWindow(TextService* service, EditSession* session):
 	currentSel_(0),
 	hasResult_(false),
 	useCursor_(true),
+	selKeyUseCursor_(false),
+	desktopUse3DBorder_(false),
 	selKeyWidth_(0) {
 
-	if(service->isImmersive()) { // windows 8 app mode
+	if(service->isImmersive() || !desktopUse3DBorder_) { // windows 8 app mode
 		margin_ = 10;
 		rowSpacing_ = 8;
 		colSpacing_ = 12;
@@ -230,23 +232,24 @@ void CandidateWindow::onPaint(WPARAM wp, LPARAM lp) {
 	oldFont = (HFONT)SelectObject(hDC, font_);
 
 	GetClientRect(hwnd_,&rc);
-	SetTextColor(hDC, GetSysColor(COLOR_WINDOWTEXT));
-	SetBkColor(hDC, GetSysColor(COLOR_WINDOW));
+	SetTextColor(hDC, textColor_);
+	SetBkColor(hDC, backColor_);
 
 	// paint window background and border
 	// draw a flat black border in Windows 8 app immersive mode
 	// draw a 3d border in desktop mode
-	if(isImmersive()) {
-		HPEN pen = ::CreatePen(PS_SOLID, 3, RGB(0, 0, 0));
+	if(isImmersive() || !desktopUse3DBorder_) {
+		HPEN pen = ::CreatePen(PS_SOLID, 3, borderColor_);
 		HGDIOBJ oldPen = ::SelectObject(hDC, pen);
 		::Rectangle(hDC, rc.left, rc.top, rc.right, rc.bottom);
 		::SelectObject(hDC, oldPen);
 		::DeleteObject(pen);
+		::FillSolidRect(ps.hdc, rc.left + 2, rc.top + 2, rc.right - rc.left - 4, rc.bottom - rc.top - 4, backColor_);
 	}
 	else {
 		// draw a 3d border in desktop mode
-		::FillSolidRect(ps.hdc, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, GetSysColor(COLOR_WINDOW));
-		::Draw3DBorder(hDC, &rc, GetSysColor(COLOR_3DFACE), 0);
+		::FillSolidRect(ps.hdc, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top, backColor_);
+		::Draw3DBorder(hDC, &rc, backColor_, borderColor_);
 	}
 
 	// paint items
@@ -392,32 +395,44 @@ void CandidateWindow::setUseCursor(bool use) {
 		::InvalidateRect(hwnd_, NULL, TRUE);
 }
 
+void CandidateWindow::setSelKeyUseCursor(bool use) {
+	selKeyUseCursor_ = use;
+	if(isVisible())
+		::InvalidateRect(hwnd_, NULL, TRUE);
+}
+
 void CandidateWindow::paintItem(HDC hDC, int i,  int x, int y) {
 	RECT textRect = {x, y, 0, y + itemHeight_};
 	wchar_t selKey[] = L"?. ";
 	selKey[0] = selKeys_[i];
 	textRect.right = textRect.left + selKeyWidth_;
-	// FIXME: make the color of strings configurable.
-	COLORREF selKeyColor = RGB(0, 0, 255);
-	COLORREF oldColor = ::SetTextColor(hDC, selKeyColor);
+	if (selKeyUseCursor_ && i == currentSel_) { // invert the selected item
+		::SetTextColor(hDC, hilitedLabelTextColor_);
+		::SetBkColor(hDC, hilitedCandidateBackColor_);
+	}
+	else {
+		::SetTextColor(hDC, labelTextColor_);
+		::SetBkColor(hDC, backColor_);
+	}
+
 	// paint the selection key
 	::ExtTextOut(hDC, textRect.left, textRect.top, ETO_OPAQUE, &textRect, selKey, 3, NULL);
-	::SetTextColor(hDC, oldColor); // restore text color
 
 	// paint the candidate string
 	wstring& item = items_.at(i);
 	textRect.left += selKeyWidth_;
 	textRect.right = textRect.left + textWidth_;
+
+	if(useCursor_ && i == currentSel_) { // invert the selected item
+		::SetTextColor(hDC, hilitedCandidateTextColor_);
+		::SetBkColor(hDC, hilitedCandidateBackColor_);
+	} else {
+		::SetTextColor(hDC, candidateTextColor_);
+		::SetBkColor(hDC, backColor_);
+	}
 	// paint the candidate string
 	::ExtTextOut(hDC, textRect.left, textRect.top, ETO_OPAQUE, &textRect, item.c_str(), item.length(), NULL);
 
-	if(useCursor_ && i == currentSel_) { // invert the selected item
-		int left = textRect.left; // - selKeyWidth_;
-		int top = textRect.top;
-		int width = textRect.right - left;
-		int height = itemHeight_;
-		::BitBlt(hDC, left, top, width, itemHeight_, hDC, left, top, NOTSRCCOPY);
-	}
 }
 
 void CandidateWindow::itemRect(int i, RECT& rect) {
@@ -430,5 +445,29 @@ void CandidateWindow::itemRect(int i, RECT& rect) {
 	rect.bottom = rect.top + itemHeight_;
 }
 
+void CandidateWindow::moveWindow(const RECT& textRect) {
+	int w, h;
+	size(&w, &h);
+	int x, y;
+	x = textRect.left;
+	y = textRect.bottom;
+	// ensure that the window does not fall outside of the screen.
+	RECT rc = { x, y, x + w, y + h }; // current window rect
+									  // get the nearest monitor
+	HMONITOR monitor = ::MonitorFromRect(&rc, MONITOR_DEFAULTTONEAREST);
+	MONITORINFO mi;
+	mi.cbSize = sizeof(mi);
+	if (GetMonitorInfo(monitor, &mi))
+		rc = mi.rcWork;
+	if (x < rc.left)
+		x = rc.left;
+	else if ((x + w) > rc.right)
+		x = rc.right - w;
 
+	if (y < rc.top)
+		y = rc.top;
+	else if ((y + h) > rc.bottom)
+		y = textRect.top - h;
+	::MoveWindow(hwnd_, x, y, w, h, TRUE);
+}
 } // namespace Ime
