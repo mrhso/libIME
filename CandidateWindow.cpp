@@ -445,12 +445,12 @@ void CandidateWindow::itemRect(int i, RECT& rect) {
 	rect.bottom = rect.top + itemHeight_;
 }
 
-void CandidateWindow::moveWindow(const RECT& textRect) {
+void CandidateWindow::moveWindow(const RECT& textRect, int spacing) {
 	int w, h;
 	size(&w, &h);
 	int x, y;
 	x = textRect.left;
-	y = textRect.bottom;
+	y = textRect.bottom + spacing;
 	// ensure that the window does not fall outside of the screen.
 	RECT rc = { x, y, x + w, y + h }; // current window rect
 									  // get the nearest monitor
@@ -467,7 +467,7 @@ void CandidateWindow::moveWindow(const RECT& textRect) {
 	if (y < rc.top)
 		y = rc.top;
 	else if ((y + h) > rc.bottom)
-		y = textRect.top - h;
+		y = textRect.top - h - spacing;
 	::MoveWindow(hwnd_, x, y, w, h, TRUE);
 }
 } // namespace Ime

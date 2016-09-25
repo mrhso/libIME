@@ -36,7 +36,7 @@ class CandidateWindow :
 	public ITfCandidateListUIElement {
 public:
 	CandidateWindow(TextService* service, EditSession* session);
-	void moveWindow(const RECT& textRect);
+	void moveWindow(const RECT& textRect, int spacing);
 
 	// IUnknown
 	STDMETHODIMP QueryInterface(REFIID riid, void **ppvObj);
