@@ -62,16 +62,12 @@ TextService::~TextService(void) {
 				source = globalCompartment(it->guid);
 			else
 				source = threadCompartment(it->guid);
-			source->UnadviseSink(it->cookie);
+			if (source) {
+				source->UnadviseSink(it->cookie);
+			}
 		}
 	}
 
-	if(!langBarButtons_.empty()) {
-		for(vector<LangBarButton*>::iterator it = langBarButtons_.begin(); it != langBarButtons_.end(); ++it) {
-			LangBarButton* button = *it;
-			button->Release();
-		}
-	}
 	if(langBarMgr_) {
 		langBarMgr_->UnadviseEventSink(langBarSinkCookie_);
 	}
@@ -106,13 +102,11 @@ DWORD TextService::langBarStatus() const {
 
 void TextService::addButton(LangBarButton* button) {
 	if(button) {
-		langBarButtons_.push_back(button);
-		button->AddRef();
+		langBarButtons_.emplace_back(button);
 		if(isActivated()) {
-			ITfLangBarItemMgr* langBarItemMgr;
+			ComPtr<ITfLangBarItemMgr> langBarItemMgr;
 			if(threadMgr_->QueryInterface(IID_ITfLangBarItemMgr, (void**)&langBarItemMgr) == S_OK) {
 				langBarItemMgr->AddItem(button);
-				langBarItemMgr->Release();
 			}
 		}
 	}
@@ -120,17 +114,14 @@ void TextService::addButton(LangBarButton* button) {
 
 void TextService::removeButton(LangBarButton* button) {
 	if(button) {
-		vector<LangBarButton*>::iterator it;
-		it = find(langBarButtons_.begin(), langBarButtons_.end(), button);
+		auto it = find(langBarButtons_.begin(), langBarButtons_.end(), button);
 		if(it != langBarButtons_.end()) {
 			if(isActivated()) {
-				ITfLangBarItemMgr* langBarItemMgr;
+				ComPtr<ITfLangBarItemMgr> langBarItemMgr;
 				if(threadMgr_->QueryInterface(IID_ITfLangBarItemMgr, (void**)&langBarItemMgr) == S_OK) {
 					langBarItemMgr->RemoveItem(button);
-					langBarItemMgr->Release();
 				}
 			}
-			button->Release();
 			langBarButtons_.erase(it);
 		}
 	}
@@ -619,13 +610,13 @@ STDMETHODIMP_(ULONG) TextService::AddRef(void) {
 
 STDMETHODIMP_(ULONG) TextService::Release(void) {
 	assert(refCount_ > 0);
-	--refCount_;
+	const ULONG newCount = --refCount_;
 	if(0 == refCount_) {
 		// ImeModule needs to do some clean up before deleting the TextService object.
 		module_->removeTextService(this);
 		delete this;
 	}
-	return refCount_;
+	return newCount;
 }
 
 // ITfTextInputProcessor
@@ -698,8 +689,7 @@ STDMETHODIMP TextService::Activate(ITfThreadMgr *pThreadMgr, TfClientId tfClient
 	if(!langBarButtons_.empty()) {
 		ComPtr<ITfLangBarItemMgr> langBarItemMgr;
 		if(threadMgr_->QueryInterface(IID_ITfLangBarItemMgr, (void**)&langBarItemMgr) == S_OK) {
-			for(vector<LangBarButton*>::iterator it = langBarButtons_.begin(); it != langBarButtons_.end(); ++it) {
-				LangBarButton* button = *it;
+			for(auto& button: langBarButtons_) {
 				langBarItemMgr->AddItem(button);
 			}
 		}
@@ -727,8 +717,7 @@ STDMETHODIMP TextService::Deactivate() {
 	if(!langBarButtons_.empty()) {
 		ComPtr<ITfLangBarItemMgr> langBarItemMgr;
 		if(threadMgr_->QueryInterface(IID_ITfLangBarItemMgr, (void**)&langBarItemMgr) == S_OK) {
-			for(vector<LangBarButton*>::iterator it = langBarButtons_.begin(); it != langBarButtons_.end(); ++it) {
-				LangBarButton* button = *it;
+			for(auto& button: langBarButtons_) {
 				langBarItemMgr->RemoveItem(button);
 			}
 		}

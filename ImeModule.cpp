@@ -507,6 +507,7 @@ STDMETHODIMP_(ULONG) ImeModule::Release(void) {
 	assert(refCount_ > 0);
 	if(::InterlockedExchangeSubtract(&refCount_, 1) == 1) {
 		delete this;
+		return 0;
 	}
 	return refCount_;
 }
