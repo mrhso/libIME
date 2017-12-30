@@ -264,7 +264,10 @@ void CandidateWindow::onPaint(WPARAM wp, LPARAM lp) {
 			y += itemHeight_ + rowSpacing_;
 		}
 		else {
-			x += colSpacing_ + selKeyWidth_ + textWidth_;
+            SIZE candidateSize;
+            wstring& item = items_.at(i);
+            ::GetTextExtentPoint32W(hDC, item.c_str(), item.length(), &candidateSize);
+			x += colSpacing_ + selKeyWidth_ + candidateSize.cx;
 		}
 	}
 	SelectObject(hDC, oldFont);
@@ -299,8 +302,12 @@ void CandidateWindow::recalculateSize() {
 		SIZE candidateSize;
 		wstring& item = items_.at(i);
 		::GetTextExtentPoint32W(hDC, item.c_str(), item.length(), &candidateSize);
-		if(candidateSize.cx > textWidth_)
-			textWidth_ = candidateSize.cx;
+        if (items_.size() > candPerRow_ && candidateSize.cx > textWidth_) {
+            textWidth_ = candidateSize.cx;
+        }
+        else {
+            width += selKeyWidth_ + candidateSize.cx;
+        }
 		int itemHeight = max(candidateSize.cy, selKeySize.cy);
 		if(itemHeight > itemHeight_)
 			itemHeight_ = itemHeight;
@@ -309,7 +316,6 @@ void CandidateWindow::recalculateSize() {
 	::ReleaseDC(hwnd(), hDC);
 
 	if(items_.size() <= candPerRow_) {
-		width = items_.size() * (selKeyWidth_ + textWidth_);
 		width += colSpacing_ * (items_.size() - 1);
 		width += margin_ * 2;
 		height = itemHeight_ + margin_ * 2;
@@ -421,7 +427,17 @@ void CandidateWindow::paintItem(HDC hDC, int i,  int x, int y) {
 	// paint the candidate string
 	wstring& item = items_.at(i);
 	textRect.left += selKeyWidth_;
-	textRect.right = textRect.left + textWidth_;
+
+    if (items_.size() <= candPerRow_) {
+        SIZE candidateSize;
+        wstring& item = items_.at(i);
+        ::GetTextExtentPoint32W(hDC, item.c_str(), item.length(), &candidateSize);
+        textRect.right = textRect.left + candidateSize.cx;
+    }
+    else {
+        textRect.right = textRect.left + textWidth_;
+    }
+
 
 	if(useCursor_ && i == currentSel_) { // invert the selected item
 		::SetTextColor(hDC, hilitedCandidateTextColor_);
