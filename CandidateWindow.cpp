@@ -255,6 +255,7 @@ void CandidateWindow::onPaint(WPARAM wp, LPARAM lp) {
 	// paint items
 	int col = 0;
 	int x = margin_, y = margin_;
+    bool horizontal = isHorizontal();
 	for(int i = 0, n = items_.size(); i < n; ++i) {
 		paintItem(hDC, i, x, y);
 		++col; // go to next column
@@ -264,10 +265,16 @@ void CandidateWindow::onPaint(WPARAM wp, LPARAM lp) {
 			y += itemHeight_ + rowSpacing_;
 		}
 		else {
-            SIZE candidateSize;
-            wstring& item = items_.at(i);
-            ::GetTextExtentPoint32W(hDC, item.c_str(), item.length(), &candidateSize);
-			x += colSpacing_ + selKeyWidth_ + candidateSize.cx;
+            x += colSpacing_ + selKeyWidth_;
+            if (horizontal) {
+                SIZE candidateSize;
+                wstring& item = items_.at(i);
+                ::GetTextExtentPoint32W(hDC, item.c_str(), item.length(), &candidateSize);
+                x += candidateSize.cx;
+            }
+            else {
+                x += textWidth_;
+            }
 		}
 	}
 	SelectObject(hDC, oldFont);
@@ -302,7 +309,7 @@ void CandidateWindow::recalculateSize() {
 		SIZE candidateSize;
 		wstring& item = items_.at(i);
 		::GetTextExtentPoint32W(hDC, item.c_str(), item.length(), &candidateSize);
-        if (items_.size() > candPerRow_ && candidateSize.cx > textWidth_) {
+        if (!isHorizontal() && candidateSize.cx > textWidth_) {
             textWidth_ = candidateSize.cx;
         }
         else {
@@ -315,7 +322,7 @@ void CandidateWindow::recalculateSize() {
 	::SelectObject(hDC, oldFont);
 	::ReleaseDC(hwnd(), hDC);
 
-	if(items_.size() <= candPerRow_) {
+	if(isHorizontal()) {
 		width += colSpacing_ * (items_.size() - 1);
 		width += margin_ * 2;
 		height = itemHeight_ + margin_ * 2;
@@ -428,7 +435,7 @@ void CandidateWindow::paintItem(HDC hDC, int i,  int x, int y) {
 	wstring& item = items_.at(i);
 	textRect.left += selKeyWidth_;
 
-    if (items_.size() <= candPerRow_) {
+    if (isHorizontal()) {
         SIZE candidateSize;
         wstring& item = items_.at(i);
         ::GetTextExtentPoint32W(hDC, item.c_str(), item.length(), &candidateSize);

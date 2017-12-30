@@ -155,6 +155,8 @@ protected: // COM object should not be deleted directly. calling Release() inste
 	~CandidateWindow(void);
 
 private:
+
+    inline bool isHorizontal() const { return items_.size() <= candPerRow_; }
 	ULONG refCount_;
 	BOOL shown_;
 
